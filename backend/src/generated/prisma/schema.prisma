@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------
+// ENUMS (Status e Tipos padronizados)
+// ------------------------------------------------------
+
+enum SessionStatus {
+  BOT
+  WAITING
+  ACTIVE
+  CLOSED
+}
+
+enum SenderType {
+  CONTACT
+  AGENT
+  BOT
+}
+
+// ------------------------------------------------------
+// MODELS (Tabelas do Banco)
+// ------------------------------------------------------
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions Session[]
+  messages Message[]
+}
+
+model Contact {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String   @unique
+  avatarUrl String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions Session[]
+}
+
+model Session {
+  id        String        @id @default(uuid())
+  status    SessionStatus @default(BOT)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  messages Message[]
+}
+
+model Message {
+  id         String     @id @default(uuid())
+  content    String     @db.Text
+  senderType SenderType
+  externalId String?
+  createdAt  DateTime   @default(now())
+
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+}
