@@ -1,12 +1,20 @@
 import { Controller, Get, Post, Body } from '@nestjs/common';
-import { ContactsService } from './contacts.service';
+import { ContactsService } from './contacts.service.js';
 
 @Controller('contacts')
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 
   @Post()
-  create(@Body() createContactDto: { name: string; phone: string; avatarUrl?: string; notes?: string }) {
+  create(
+    @Body()
+    createContactDto: {
+      name: string;
+      phone: string;
+      avatarUrl?: string;
+      notes?: string;
+    },
+  ) {
     return this.contactsService.create(createContactDto);
   }
 

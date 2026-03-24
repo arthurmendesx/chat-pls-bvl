@@ -1,31 +1,61 @@
 <script lang="ts">
-	import type { Contact, Conversation } from '$lib/types';
+	import type { Contact, Session } from '$lib/types';
 	import { ContactFilter } from '$lib/types';
 	import ContactListItem from './ContactListItem.svelte';
-
-	interface Props {
-		contacts: Contact[];
-		activeContactId: string;
-		onSelectContact?: (contact: Contact) => void;
-	}
-
-	let { contacts, activeContactId, onSelectContact }: Props = $props();
+	import { api } from '$lib/services/api';
+	import { botSessions, waitingSessions, activeSessions, sessionsStore } from '$lib/stores/sessions';
+	import { chatStore } from '$lib/stores/chat';
 
 	let activeFilter = $state<ContactFilter>(ContactFilter.ALL);
 	let searchQuery = $state('');
 
 	const filters: { label: string; value: ContactFilter }[] = [
-		{ label: 'All', value: ContactFilter.ALL },
+		{ label: 'Todos', value: ContactFilter.ALL },
 		{ label: 'Bot', value: ContactFilter.BOT },
-		{ label: 'Waiting', value: ContactFilter.WAITING },
-		{ label: 'Mine', value: ContactFilter.MINE }
+		{ label: 'Espera', value: ContactFilter.WAITING },
+		{ label: 'Meus', value: ContactFilter.MINE }
 	];
+
+	// Usa o store derivado dependendo do filtro selecionado
+	const visibleSessions = $derived.by(() => {
+		let list: Session[] = [];
+		if (activeFilter === ContactFilter.ALL || activeFilter === ContactFilter.MINE) {
+			list = $sessionsStore;
+		} else if (activeFilter === ContactFilter.BOT) {
+			list = $botSessions;
+		} else if (activeFilter === ContactFilter.WAITING) {
+			list = $waitingSessions;
+		}
+
+		if (searchQuery) {
+			const lower = searchQuery.toLowerCase();
+			return list.filter((s) => s.contact.name.toLowerCase().includes(lower) || s.contact.phone.includes(lower));
+		}
+		return list;
+	});
+
+	async function handleSelectSession(session: Session) {
+		try {
+			chatStore.setLoading(true);
+			const response = await api.fetchChatHistory(session.id);
+			console.log('API Response:', response); // Console requisitado
+			
+			const sessionData = response.session || (response as any).data?.session || session;
+			const messagesData = response.messages || (response as any).data?.messages || [];
+			
+			chatStore.setActiveSession(sessionData, messagesData);
+		} catch (error) {
+			console.error(error);
+			alert('Falha ao abrir a conversa.');
+			chatStore.clearSession();
+		}
+	}
 </script>
 
 <aside class="flex h-full w-80 flex-col border-r border-gray-200 bg-white">
 	<!-- Logo -->
 	<div class="flex items-center gap-2 border-b border-gray-200 px-4 py-4">
-		<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
+		<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
 			<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path
 					stroke-linecap="round"
@@ -56,8 +86,8 @@
 			</svg>
 			<input
 				type="text"
-				placeholder="Search contacts..."
-				class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+				placeholder="Buscar contatos..."
+				class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
 				bind:value={searchQuery}
 			/>
 		</div>
@@ -70,7 +100,7 @@
 				type="button"
 				class="rounded-full px-3 py-1 text-xs font-medium transition-colors {activeFilter ===
 				filter.value
-					? 'bg-emerald-600 text-white'
+					? 'bg-blue-600 text-white'
 					: 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
 				onclick={() => (activeFilter = filter.value)}
 			>
@@ -81,11 +111,12 @@
 
 	<!-- Contact List -->
 	<div class="custom-scrollbar flex-1 overflow-y-auto">
-		{#each contacts as contact (contact.id)}
+		{#each visibleSessions as session (session.id)}
 			<ContactListItem
-				{contact}
-				isActive={contact.id === activeContactId}
-				onclick={() => onSelectContact?.(contact)}
+				contact={session.contact}
+				isActive={$chatStore.session?.id === session.id}
+				lastMessage={session.messages?.[0]?.content}
+				onclick={() => handleSelectSession(session)}
 			/>
 		{/each}
 	</div>

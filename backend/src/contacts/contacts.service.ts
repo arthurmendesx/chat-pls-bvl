@@ -1,29 +1,33 @@
 import { Injectable, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service.js';
+import type { Contact } from '@prisma/client';
+
+interface CreateContactData {
+  readonly name: string;
+  readonly phone: string;
+  readonly avatarUrl?: string;
+  readonly notes?: string;
+}
 
 @Injectable()
 export class ContactsService {
-  // Injetamos o Prisma aqui
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async create(data: { name: string; phone: string; avatarUrl?: string; notes?: string }) {
-    // 1. Verifica se o contato já existe pelo telefone
-    const existingContact = await this.prisma.contact.findUnique({
+  async create(data: CreateContactData): Promise<Contact> {
+    const existing = await this.prisma.contact.findUnique({
       where: { phone: data.phone },
     });
 
-    if (existingContact) {
-      throw new ConflictException('Já existe um contato com este número de telefone.');
+    if (existing) {
+      throw new ConflictException(
+        'Já existe um contato com este número de telefone.',
+      );
     }
 
-    // 2. Cria no banco de dados
-    return this.prisma.contact.create({
-      data,
-    });
+    return this.prisma.contact.create({ data });
   }
 
-  async findAll() {
-    // Retorna todos os contatos ordenados pelos mais recentes
+  async findAll(): Promise<Contact[]> {
     return this.prisma.contact.findMany({
       orderBy: { createdAt: 'desc' },
     });

@@ -8,23 +8,24 @@
 
 | Token                | Tailwind Class          | Hex         | Usage                                       |
 |----------------------|-------------------------|-------------|---------------------------------------------|
-| `brand-primary`      | `emerald-600`           | `#059669`   | Primary buttons, active states, links        |
-| `brand-primary-dark` | `emerald-700`           | `#047857`   | Hover states for primary elements            |
-| `brand-primary-light`| `emerald-50`            | `#ecfdf5`   | Subtle primary backgrounds                   |
-| `bg-app`             | `gray-50`               | `#f9fafb`   | Main application background                  |
+| `brand-primary`      | `blue-600`              | `#2563eb`   | Primary buttons, active states, links        |
+| `brand-primary-dark` | `blue-700`              | `#1d4ed8`   | Hover states for primary elements            |
+| `brand-primary-light`| `blue-50`               | `#eff6ff`   | Subtle primary backgrounds                   |
+| `brand-accent`       | `orange-500`            | `#f97316`   | Notifications, highlights, secondary buttons |
+| `bg-app`             | `slate-50`              | `#f8fafc`   | Main application background                  |
 | `bg-sidebar`         | `white`                 | `#ffffff`   | Sidebar background                           |
-| `bg-chat`            | `gray-50`               | `#f9fafb`   | Chat area background                         |
+| `bg-chat`            | `slate-50`              | `#f8fafc`   | Chat area background                         |
 | `bg-panel`           | `white`                 | `#ffffff`   | Right panel background                       |
-| `bg-bubble-bot`      | `gray-700`              | `#374151`   | Bot message bubble background                |
-| `bg-bubble-user`     | `gray-100`              | `#f3f4f6`   | User/customer message bubble background      |
+| `bg-bubble-bot`      | `blue-600`              | `#2563eb`   | Bot/Agent message bubble background          |
+| `bg-bubble-user`     | `white`                 | `#ffffff`   | User/customer message bubble background      |
 | `bg-input`           | `white`                 | `#ffffff`   | Input fields background                      |
 | `text-primary`       | `gray-900`              | `#111827`   | Headings, contact names                      |
 | `text-secondary`     | `gray-600`              | `#4b5563`   | Body text, phone numbers                     |
 | `text-muted`         | `gray-400`              | `#9ca3af`   | Timestamps, placeholders                     |
 | `text-on-dark`       | `white`                 | `#ffffff`   | Text on dark bubbles / primary buttons       |
 | `border-default`     | `gray-200`              | `#e5e7eb`   | Dividers, input borders, panel borders       |
-| `status-online`      | `emerald-500`           | `#10b981`   | Online indicator dots                        |
-| `status-waiting`     | `amber-500`             | `#f59e0b`   | Waiting / attention indicator                |
+| `status-online`      | `green-500`             | `#22c55e`   | Online indicator dots                        |
+| `status-waiting`     | `orange-500`            | `#f97316`   | Waiting / attention indicator                |
 | `status-error`       | `red-500`               | `#ef4444`   | End session, destructive actions             |
 
 ---
@@ -60,10 +61,10 @@
 
 ### Border Radius
 
-| Element               | Class           |
+| Elements              | Class           |
 |-----------------------|-----------------|
-| Buttons               | `rounded-lg`    |
-| Chat bubbles          | `rounded-xl`    |
+| Buttons               | `rounded-lg` or `rounded-full` |
+| Chat bubbles          | `rounded-2xl`   |
 | Input fields          | `rounded-full`  |
 | Avatars               | `rounded-full`  |
 | Filter pills          | `rounded-full`  |
@@ -89,7 +90,7 @@
 └──────────┘  └──────────┘  └──────────┘  └──────────┘
 ```
 
-- **Active:** `bg-emerald-600 text-white rounded-full px-3 py-1 text-xs font-medium`
+- **Active:** `bg-blue-600 text-white rounded-full px-3 py-1 text-xs font-medium`
 - **Inactive:** `bg-gray-100 text-gray-600 rounded-full px-3 py-1 text-xs font-medium hover:bg-gray-200`
 
 ### 4.2 Contact List Item
@@ -102,10 +103,10 @@
 └─────────────────────────────────────────┘
 ```
 
-- Container: `flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100`
-- Active/selected: `bg-emerald-50 border-l-3 border-l-emerald-600`
-- Avatar: `w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-semibold`
-- Online dot: `absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white`
+- Container: `flex items-start gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-gray-100`
+- Active/selected: `bg-blue-50 border-l-3 border-l-blue-600`
+- Avatar: `w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center text-sm font-semibold`
+- Online dot: `absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white`
 
 ### 4.3 Chat Bubble — Bot
 
@@ -118,9 +119,9 @@
 ```
 
 - Container: `flex justify-end`
-- Bubble: `bg-gray-700 text-white rounded-xl px-4 py-3 max-w-lg`
-- Label: `text-xs font-medium text-gray-300 flex items-center gap-1 mb-1`
-- Timestamp: `text-xs text-gray-400 text-right mt-1`
+- Bubble: `bg-blue-600 text-white rounded-2xl rounded-br-none px-4 py-3 max-w-lg`
+- Label: `text-xs font-medium text-blue-100 flex items-center gap-1 mb-1`
+- Timestamp: `text-xs text-blue-200 text-right mt-1`
 
 ### 4.4 Chat Bubble — User (Customer)
 
@@ -132,16 +133,16 @@
 ```
 
 - Container: `flex justify-start`
-- Bubble: `bg-gray-100 text-gray-900 rounded-xl px-4 py-3 max-w-lg`
+- Bubble: `bg-white shadow-sm text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 max-w-lg`
 - Timestamp: `text-xs text-gray-400 mt-1`
 
 ### 4.5 Action Buttons (Right Panel)
 
 | Button           | Style                                                                                   |
 |------------------|-----------------------------------------------------------------------------------------|
-| Take over chat   | `bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2.5 w-full font-medium` |
-| Return to Bot    | `border border-gray-300 text-gray-700 rounded-lg px-4 py-2.5 w-full font-medium hover:bg-gray-50` |
-| End Session      | `border border-gray-300 text-red-500 rounded-lg px-4 py-2.5 w-full font-medium hover:bg-red-50` |
+| Take over chat   | `bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all text-white rounded-full px-4 py-2.5 w-full font-medium` |
+| Return to Bot    | `border border-gray-300 text-gray-700 rounded-full px-4 py-2.5 w-full font-medium hover:bg-slate-50 transition-all` |
+| End Session      | `border border-gray-300 text-red-500 rounded-full px-4 py-2.5 w-full font-medium hover:bg-red-50 transition-all` |
 
 ### 4.6 Message Input Bar
 
@@ -152,5 +153,5 @@
 ```
 
 - Container: `flex items-center gap-2 p-4 border-t border-gray-200 bg-white`
-- Input: `flex-1 border border-gray-300 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500`
-- Send button: `bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2.5 flex items-center gap-1 text-sm font-medium`
+- Input: `flex-1 border border-gray-300 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600`
+- Send button: `bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all text-white rounded-full px-4 py-2.5 flex items-center gap-1 text-sm font-medium`

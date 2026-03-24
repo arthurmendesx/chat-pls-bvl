@@ -54,6 +54,7 @@ model Contact {
 model Session {
   id        String        @id @default(uuid())
   status    SessionStatus @default(BOT)
+  bot_state String?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 

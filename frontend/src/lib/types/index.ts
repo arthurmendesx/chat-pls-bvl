@@ -1,15 +1,17 @@
 /** Shared TypeScript types for the ChatSupport frontend. */
 
-export enum MessageSender {
+export enum SenderType {
 	BOT = 'BOT',
 	USER = 'USER',
-	AGENT = 'AGENT'
+	AGENT = 'AGENT',
+	CONTACT = 'CONTACT'
 }
 
-export enum ConversationStatus {
+export enum SessionStatus {
 	ACTIVE = 'ACTIVE',
 	WAITING = 'WAITING',
-	CLOSED = 'CLOSED'
+	CLOSED = 'CLOSED',
+	BOT = 'BOT'
 }
 
 export enum ContactFilter {
@@ -23,24 +25,24 @@ export interface Contact {
 	readonly id: string;
 	name: string;
 	phone: string;
-	initials: string;
-	isOnline: boolean;
-	lastMessage: string;
-	avatarColor: string;
+	avatarUrl?: string;
+	notes?: string;
 }
 
 export interface Message {
 	readonly id: string;
-	conversationId: string;
-	sender: MessageSender;
+	sessionId: string;
+	senderType: SenderType;
 	content: string;
-	timestamp: string;
+	createdAt: string;
 }
 
-export interface Conversation {
+export interface Session {
 	readonly id: string;
+	contactId: string;
 	contact: Contact;
 	messages: Message[];
-	status: ConversationStatus;
-	waitingTime: string;
+	status: SessionStatus;
+	bot_state?: string;
+	updatedAt: string;
 }
