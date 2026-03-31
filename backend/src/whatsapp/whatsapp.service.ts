@@ -1,5 +1,9 @@
 import { Injectable, Logger, BadGatewayException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ContactsService } from '../contacts/contacts.service.js';
+import { SessionsService } from '../sessions/sessions.service.js';
+import { MessagesRepository } from '../chat/messages.repository.js';
+import type { WebhookPayloadDto } from './dto/webhook-payload.dto.js';
 
 interface MetaMessagePayload {
   readonly messaging_product: 'whatsapp';
@@ -21,6 +25,11 @@ interface MetaErrorResponse {
   readonly error: MetaErrorDetail;
 }
 
+export interface WebhookProcessingResult {
+  readonly processed: number;
+  readonly sessions: string[];
+}
+
 const META_API_BASE = 'https://graph.facebook.com/v19.0';
 
 @Injectable()
@@ -29,9 +38,68 @@ export class WhatsAppService {
   private readonly accessToken: string;
   private readonly phoneNumberId: string;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly contactsService: ContactsService,
+    private readonly sessionsService: SessionsService,
+    private readonly messagesRepository: MessagesRepository,
+  ) {
     this.accessToken = this.config.getOrThrow<string>('META_ACCESS_TOKEN');
     this.phoneNumberId = this.config.getOrThrow<string>('META_PHONE_NUMBER_ID');
+  }
+
+  async processIncomingWebhook(
+    payload: WebhookPayloadDto,
+  ): Promise<WebhookProcessingResult> {
+    let processed = 0;
+    const sessionIds: string[] = [];
+
+    for (const entry of payload.entry) {
+      for (const change of entry.changes) {
+        if (change.field !== 'messages') continue;
+
+        const { value } = change;
+        const messages = value.messages ?? [];
+        const contacts = value.contacts ?? [];
+
+        for (const message of messages) {
+          if (message.type !== 'text' || !message.text) continue;
+
+          const contactProfile = contacts.find(
+            (c) => c.wa_id === message.from,
+          );
+          const contactName = contactProfile?.profile?.name ?? message.from;
+
+          const contact = await this.contactsService.findOrCreateByPhone(
+            message.from,
+            contactName,
+          );
+
+          const session = await this.sessionsService.findOrCreateForContact(
+            contact.id,
+          );
+
+          await this.messagesRepository.create({
+            content: message.text.body,
+            senderType: 'CONTACT',
+            externalId: message.id,
+            sessionId: session.id,
+          });
+
+          if (!sessionIds.includes(session.id)) {
+            sessionIds.push(session.id);
+          }
+
+          processed++;
+
+          this.logger.log(
+            `Mensagem recebida de ${message.from} na sessão ${session.id} (status: ${session.status})`,
+          );
+        }
+      }
+    }
+
+    return { processed, sessions: sessionIds };
   }
 
   async sendTextMessage(recipientPhone: string, text: string): Promise<string> {

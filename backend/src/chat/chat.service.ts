@@ -3,107 +3,38 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { MessagesRepository } from './messages.repository.js';
+import { SessionsService } from '../sessions/sessions.service.js';
 import { WhatsAppService } from '../whatsapp/whatsapp.service.js';
-import type {
-  SessionStatus,
-  SenderType,
-  Session,
-  Contact,
-  Message,
-} from '@prisma/client';
-
-export interface SessionWithContact extends Session {
-  readonly contact: Contact;
-}
+import type { Message } from '@prisma/client';
+import type { SessionWithContact } from '../sessions/sessions.repository.js';
 
 export interface MessageHistoryResponse {
   readonly session: SessionWithContact;
   readonly messages: readonly Message[];
 }
 
-const VALID_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
-  BOT: ['WAITING', 'ACTIVE', 'CLOSED'],
-  WAITING: ['ACTIVE', 'CLOSED'],
-  ACTIVE: ['BOT', 'CLOSED'],
-};
-
 @Injectable()
 export class ChatService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly messagesRepository: MessagesRepository,
+    private readonly sessionsService: SessionsService,
     private readonly whatsAppService: WhatsAppService,
   ) {}
 
   async getMessages(sessionId: string): Promise<MessageHistoryResponse> {
-    const session = await this.prisma.session.findUnique({
-      where: { id: sessionId },
-      include: { contact: true },
-    });
+    const session = await this.sessionsService.findById(sessionId);
+    const messages = await this.messagesRepository.findBySessionId(sessionId);
 
-    if (!session) {
-      throw new NotFoundException(
-        `Sessão com ID "${sessionId}" não encontrada.`,
-      );
-    }
-
-    const messages = await this.prisma.message.findMany({
-      where: { sessionId },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    return {
-      session: session as SessionWithContact,
-      messages,
-    };
-  }
-
-  async updateStatus(
-    sessionId: string,
-    newStatus: string,
-  ): Promise<SessionWithContact> {
-    const session = await this.prisma.session.findUnique({
-      where: { id: sessionId },
-      include: { contact: true },
-    });
-
-    if (!session) {
-      throw new NotFoundException(
-        `Sessão com ID "${sessionId}" não encontrada.`,
-      );
-    }
-
-    const allowedTransitions =
-      VALID_STATUS_TRANSITIONS[session.status] ?? [];
-
-    if (!allowedTransitions.includes(newStatus)) {
-      throw new BadRequestException(
-        `Não é possível alterar o status de "${session.status}" para "${newStatus}". ` +
-          `Transições permitidas: ${allowedTransitions.join(', ') || 'nenhuma'}.`,
-      );
-    }
-
-    return this.prisma.session.update({
-      where: { id: sessionId },
-      data: { status: newStatus as SessionStatus },
-      include: { contact: true },
-    }) as Promise<SessionWithContact>;
+    return { session, messages };
   }
 
   async sendMessage(
     sessionId: string,
     content: string,
+    userId: string,
   ): Promise<Message> {
-    const session = await this.prisma.session.findUnique({
-      where: { id: sessionId },
-      include: { contact: true },
-    });
-
-    if (!session) {
-      throw new NotFoundException(
-        `Sessão com ID "${sessionId}" não encontrada.`,
-      );
-    }
+    const session = await this.sessionsService.findById(sessionId);
 
     if (session.status !== 'ACTIVE') {
       throw new BadRequestException(
@@ -111,19 +42,17 @@ export class ChatService {
       );
     }
 
-    const contact = (session as SessionWithContact).contact;
     const externalId = await this.whatsAppService.sendTextMessage(
-      contact.phone,
+      session.contact.phone,
       content,
     );
 
-    return this.prisma.message.create({
-      data: {
-        content,
-        senderType: 'AGENT' as SenderType,
-        externalId,
-        sessionId,
-      },
+    return this.messagesRepository.create({
+      content,
+      senderType: 'AGENT',
+      externalId,
+      sessionId,
+      userId,
     });
   }
 }

@@ -1,9 +1,17 @@
-import { Controller, Get, Patch, Post, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { ChatService } from './chat.service.js';
-import { UpdateStatusDto } from './dto/update-status.dto.js';
 import { SendMessageDto } from './dto/send-message.dto.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
+
+interface JwtPayload {
+  readonly userId: string;
+  readonly email: string;
+  readonly role: string;
+}
 
 @Controller('chats')
+@UseGuards(JwtAuthGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
@@ -12,19 +20,12 @@ export class ChatController {
     return this.chatService.getMessages(sessionId);
   }
 
-  @Patch(':sessionId/status')
-  updateStatus(
-    @Param('sessionId') sessionId: string,
-    @Body() dto: UpdateStatusDto,
-  ) {
-    return this.chatService.updateStatus(sessionId, dto.status);
-  }
-
   @Post(':sessionId/send')
   sendMessage(
     @Param('sessionId') sessionId: string,
     @Body() dto: SendMessageDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.chatService.sendMessage(sessionId, dto.content);
+    return this.chatService.sendMessage(sessionId, dto.content, user.userId);
   }
 }

@@ -1,16 +1,10 @@
 import { IsOptional, IsEnum } from 'class-validator';
-
-enum SessionStatusFilter {
-  BOT = 'BOT',
-  WAITING = 'WAITING',
-  ACTIVE = 'ACTIVE',
-  CLOSED = 'CLOSED',
-}
+import { SessionStatusEnum } from '../../common/enums/session-status.enum.js';
 
 export class SessionFilterDto {
   @IsOptional()
-  @IsEnum(SessionStatusFilter, {
+  @IsEnum(SessionStatusEnum, {
     message: 'Status deve ser: BOT, WAITING, ACTIVE ou CLOSED',
   })
-  status?: SessionStatusFilter;
+  status?: SessionStatusEnum;
 }

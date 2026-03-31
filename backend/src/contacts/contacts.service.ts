@@ -1,22 +1,14 @@
 import { Injectable, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { ContactsRepository } from './contacts.repository.js';
 import type { Contact } from '@prisma/client';
-
-interface CreateContactData {
-  readonly name: string;
-  readonly phone: string;
-  readonly avatarUrl?: string;
-  readonly notes?: string;
-}
+import type { CreateContactDto } from './dto/create-contact.dto.js';
 
 @Injectable()
 export class ContactsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly contactsRepository: ContactsRepository) {}
 
-  async create(data: CreateContactData): Promise<Contact> {
-    const existing = await this.prisma.contact.findUnique({
-      where: { phone: data.phone },
-    });
+  async create(dto: CreateContactDto): Promise<Contact> {
+    const existing = await this.contactsRepository.findByPhone(dto.phone);
 
     if (existing) {
       throw new ConflictException(
@@ -24,12 +16,14 @@ export class ContactsService {
       );
     }
 
-    return this.prisma.contact.create({ data });
+    return this.contactsRepository.create(dto);
   }
 
   async findAll(): Promise<Contact[]> {
-    return this.prisma.contact.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.contactsRepository.findAll();
+  }
+
+  async findOrCreateByPhone(phone: string, name: string): Promise<Contact> {
+    return this.contactsRepository.upsertByPhone(phone, { name, phone });
   }
 }

@@ -6,49 +6,48 @@ datasource db {
   provider = "postgresql"
 }
 
-// ------------------------------------------------------
-// ENUMS (Status e Tipos padronizados)
-// ------------------------------------------------------
+enum UserRole {
+  ADMIN
+  AGENT
+}
 
 enum SessionStatus {
-  BOT       
-  WAITING   
-  ACTIVE    
-  CLOSED    
+  BOT
+  WAITING
+  ACTIVE
+  CLOSED
 }
 
 enum SenderType {
-  CONTACT   
-  AGENT     
-  BOT       
+  CONTACT
+  AGENT
+  BOT
 }
 
-// ------------------------------------------------------
-// MODELS (Tabelas do Banco)
-// ------------------------------------------------------
-
 model User {
-  id        String    @id @default(uuid())
+  id        String   @id @default(uuid())
   name      String
-  email     String    @unique
+  email     String   @unique
+  password  String
+  role      UserRole @default(AGENT)
   avatarUrl String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  sessions  Session[] 
-  messages  Message[] 
+  sessions Session[]
+  messages Message[]
 }
 
 model Contact {
-  id        String    @id @default(uuid())
+  id        String   @id @default(uuid())
   name      String
-  phone     String    @unique 
+  phone     String   @unique
   avatarUrl String?
-  notes     String?   
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  sessions  Session[]
+  sessions Session[]
 }
 
 model Session {
@@ -59,24 +58,24 @@ model Session {
   updatedAt DateTime      @updatedAt
 
   contactId String
-  contact   Contact       @relation(fields: [contactId], references: [id])
-  
-  userId    String?       
-  user      User?         @relation(fields: [userId], references: [id])
+  contact   Contact @relation(fields: [contactId], references: [id])
 
-  messages  Message[]
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  messages Message[]
 }
 
 model Message {
   id         String     @id @default(uuid())
   content    String     @db.Text
   senderType SenderType
-  externalId String?    
+  externalId String?
   createdAt  DateTime   @default(now())
 
-  sessionId  String
-  session    Session    @relation(fields: [sessionId], references: [id])
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id])
 
-  userId     String?    
-  user       User?      @relation(fields: [userId], references: [id])
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 }
