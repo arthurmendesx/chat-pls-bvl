@@ -20,6 +20,56 @@ class WhatsAppTextContent {
   body!: string;
 }
 
+class WhatsAppContext {
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  id?: string;
+}
+
+class WhatsAppListReply {
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
+class WhatsAppButtonReply {
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+}
+
+class WhatsAppInteractive {
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => WhatsAppListReply)
+  list_reply?: WhatsAppListReply;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => WhatsAppButtonReply)
+  button_reply?: WhatsAppButtonReply;
+}
+
 class WhatsAppMessage {
   @IsString()
   from!: string;
@@ -34,6 +84,16 @@ class WhatsAppMessage {
   @ValidateNested()
   @Type(() => WhatsAppTextContent)
   text?: WhatsAppTextContent;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => WhatsAppContext)
+  context?: WhatsAppContext;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => WhatsAppInteractive)
+  interactive?: WhatsAppInteractive;
 
   @IsString()
   type!: string;
