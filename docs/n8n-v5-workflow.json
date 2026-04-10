@@ -1,0 +1,1108 @@
+{
+  "name": "V5-wpp-planeta-stateless",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "wpp-boulevard",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook GET (Meta Handshake)",
+      "type": "n8n-nodes-base.webhook",
+      "position": [-160, -672],
+      "webhookId": "wpp-boulevard",
+      "typeVersion": 2.1
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {}
+      },
+      "name": "Respond with Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [64, -672],
+      "typeVersion": 1.5
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wpp-boulevard",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook POST (Recebe Mensagens)",
+      "type": "n8n-nodes-base.webhook",
+      "position": [-368, 128],
+      "webhookId": "wpp-boulevard-post",
+      "typeVersion": 2.1
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://nestjs:3000/api/webhook/incoming",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-webhook-secret",
+              "value": "Z2Fsb2RvaWRvQDIwMTM="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "name": "Forward to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [-144, 128],
+      "typeVersion": 4.1
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [64, 128],
+      "typeVersion": 1.5
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "filter-has-from",
+              "leftValue": "={{ $json.body.entry[0].changes[0].value.messages[0].from }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "filtra_msg",
+      "type": "n8n-nodes-base.if",
+      "position": [288, 128],
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  c.id as contact_id, \n  c.phone,\n  c.name as contact_name,\n  s.id as session_id, \n  s.status, \n  s.bot_state,\n  s.is_processing,\n  s.last_interaction_at,\n  EXTRACT(EPOCH FROM (NOW() - s.last_interaction_at)) / 60 as minutes_inactive\nFROM \"Contact\" c\nLEFT JOIN \"Session\" s ON c.id = s.\"contactId\" AND s.status NOT IN ('CLOSED')\nWHERE c.phone = $1\nORDER BY s.\"updatedAt\" DESC\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $json.body.entry[0].changes[0].value.messages[0].from }}"
+        }
+      },
+      "name": "query_session",
+      "type": "n8n-nodes-base.postgres",
+      "position": [512, 128],
+      "typeVersion": 2.6,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "check-session-exists",
+              "leftValue": "={{ $json.session_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "session_exists?",
+      "type": "n8n-nodes-base.if",
+      "position": [736, 128],
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('query_session').item.json.status }}",
+                    "rightValue": "BOT",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "bot"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('query_session').item.json.status }}",
+                    "rightValue": "ACTIVE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "active_agent"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('query_session').item.json.status }}",
+                    "rightValue": "WAITING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "waiting_agent"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "name": "check_status",
+      "type": "n8n-nodes-base.switch",
+      "position": [960, 128],
+      "typeVersion": 3.4,
+      "alwaysOutputData": true,
+      "notesInFlow": true,
+      "notes": "If ACTIVE or WAITING → STOP (agent handles it)\nIf BOT → continue to bot logic"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE \"Session\" SET is_processing = true, \"updatedAt\" = NOW() WHERE id = $1 AND is_processing = false RETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $('query_session').item.json.session_id }}"
+        }
+      },
+      "name": "acquire_lock",
+      "type": "n8n-nodes-base.postgres",
+      "position": [1184, 0],
+      "typeVersion": 2.6,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "lock-acquired",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "lock_acquired?",
+      "type": "n8n-nodes-base.if",
+      "position": [1408, 0],
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "check-timeout",
+              "leftValue": "={{ $('query_session').item.json.minutes_inactive }}",
+              "rightValue": 60,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "inactivity_timeout?",
+      "type": "n8n-nodes-base.if",
+      "position": [1632, 0],
+      "typeVersion": 2.3,
+      "notesInFlow": true,
+      "notes": "If > 60 min inactive → reset bot_state to menu_inicial"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE \"Session\" SET bot_state = 'menu_inicial', \"updatedAt\" = NOW() WHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('query_session').item.json.session_id }}"
+        }
+      },
+      "name": "reset_bot_state",
+      "type": "n8n-nodes-base.postgres",
+      "position": [1856, -128],
+      "typeVersion": 2.6,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('query_session').item.json.bot_state }}",
+                    "rightValue": "menu_inicial",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "menu_inicial"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('query_session').item.json.bot_state }}",
+                    "rightValue": "awaiting_menu_selection",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_menu_selection"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('query_session').item.json.bot_state }}",
+                    "rightValue": "awaiting_more_questions",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_more_questions"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('query_session').item.json.bot_state }}",
+                    "rightValue": "awaiting_purchase",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_purchase"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "name": "route_by_bot_state",
+      "type": "n8n-nodes-base.switch",
+      "position": [2080, 0],
+      "typeVersion": 3.4,
+      "alwaysOutputData": true,
+      "notesInFlow": true,
+      "notes": "Routes to the correct handler based on current bot_state"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/1033608286495939/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer EAANXzFQZBS3wBQ6Q4VGHH2xgsZCv2UjAYiZB1yNGUqlyjVNZBZAUi05s0dnA6vdlHFmAZB8f6Pu0YQbfdz2PQUwqHehjI6ZCytYzYlSzVD70CHxmLJsEsEin2FlNZBNaKZB3xRrMDKRjkjR2xGxi85giFJr1ZBy8XsWwVRrA7dZBdAJWdXbjhnB00LGfofh8lw0RL1T5wZDZD"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $('query_session').item.json.phone }}\",\n  \"type\": \"interactive\",\n  \"interactive\": {\n    \"type\": \"list\",\n    \"header\": {\n      \"type\": \"text\",\n      \"text\": \"Olá! Bem-vindo(a) ao Planeta Imaginário! 🪐✨\"\n    },\n    \"body\": {\n      \"text\": \"Como podemos te ajudar a garantir a diversão da criançada hoje?\"\n    },\n    \"footer\": {\n      \"text\": \"Toque no botão abaixo para escolher uma opção\"\n    },\n    \"action\": {\n      \"button\": \"📋 Ver Opções\",\n      \"sections\": [\n        {\n          \"title\": \"Menu Principal\",\n          \"rows\": [\n            {\n              \"id\": \"menu_valores\",\n              \"title\": \"🎟️ Valores\",\n              \"description\": \"Preços por tempo de brincadeira\"\n            },\n            {\n              \"id\": \"menu_passaporte\",\n              \"title\": \"🎫 Passaportes\",\n              \"description\": \"Pacotes de horas\"\n            },\n            {\n              \"id\": \"menu_festas\",\n              \"title\": \"🥳 Festas e Eventos\",\n              \"description\": \"Orçamentos e reservas de datas\"\n            },\n            {\n              \"id\": \"menu_eventos\",\n              \"title\": \"🎨 Programações\",\n              \"description\": \"Programação especial e colônia\"\n            },\n            {\n              \"id\": \"menu_localizacao\",\n              \"title\": \"📍 Localização\",\n              \"description\": \"Onde encontrar nossa unidade\"\n            },\n            {\n              \"id\": \"menu_atendente\",\n              \"title\": \"🙋‍♀️ Equipe\",\n              \"description\": \"Dúvidas ou falar com atendente\"\n            }\n          ]\n        }\n      ]\n    }\n  }\n}",
+        "options": {}
+      },
+      "name": "send_menu",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [2304, -320],
+      "typeVersion": 4.4,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE \"Session\" SET bot_state = 'awaiting_menu_selection', last_interaction_at = NOW(), is_processing = false, \"updatedAt\" = NOW() WHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('query_session').item.json.session_id }}"
+        }
+      },
+      "name": "set_state_awaiting_menu",
+      "type": "n8n-nodes-base.postgres",
+      "position": [2528, -320],
+      "typeVersion": 2.6
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Respond 200 OK').item.json.body.entry[0].changes[0].value.messages[0].interactive.list_reply.id }}",
+                    "rightValue": "menu_valores",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "valores"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Respond 200 OK').item.json.body.entry[0].changes[0].value.messages[0].interactive.list_reply.id }}",
+                    "rightValue": "menu_localizacao",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "localizacao"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Respond 200 OK').item.json.body.entry[0].changes[0].value.messages[0].interactive.list_reply.id }}",
+                    "rightValue": "menu_eventos",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "programacao"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Respond 200 OK').item.json.body.entry[0].changes[0].value.messages[0].interactive.list_reply.id }}",
+                    "rightValue": "menu_festas",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "festas"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Respond 200 OK').item.json.body.entry[0].changes[0].value.messages[0].interactive.list_reply.id }}",
+                    "rightValue": "menu_passaporte",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "passaportes"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Respond 200 OK').item.json.body.entry[0].changes[0].value.messages[0].interactive.list_reply.id }}",
+                    "rightValue": "menu_atendente",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "atendente"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "name": "route_menu_choice",
+      "type": "n8n-nodes-base.switch",
+      "position": [2304, -96],
+      "typeVersion": 3.4,
+      "alwaysOutputData": true,
+      "notesInFlow": true,
+      "notes": "Routes by the list_reply.id selected by user"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1033608286495939",
+        "recipientPhoneNumber": "={{ $('query_session').item.json.phone }}",
+        "textBody": "Os valores são esses:",
+        "additionalFields": {}
+      },
+      "name": "send_valores",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [2528, -448],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1033608286495939",
+        "recipientPhoneNumber": "={{ $('query_session').item.json.phone }}",
+        "textBody": "A localização é essa:",
+        "additionalFields": {}
+      },
+      "name": "send_loc",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [2528, -256],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1033608286495939",
+        "recipientPhoneNumber": "={{ $('query_session').item.json.phone }}",
+        "textBody": "as programações são essas",
+        "additionalFields": {}
+      },
+      "name": "send_prog",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [2528, -64],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1033608286495939",
+        "recipientPhoneNumber": "={{ $('query_session').item.json.phone }}",
+        "textBody": "Os valores das festas são esses:",
+        "additionalFields": {}
+      },
+      "name": "send_festas",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [2528, 128],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1033608286495939",
+        "recipientPhoneNumber": "={{ $('query_session').item.json.phone }}",
+        "textBody": "Os valores dos passaportes são esses:",
+        "additionalFields": {}
+      },
+      "name": "send_passaportes",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [2528, 320],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1033608286495939",
+        "recipientPhoneNumber": "={{ $('query_session').item.json.phone }}",
+        "textBody": "Vou encaminhar você para nossa equipe de atendimento. Um momento, por favor! 🙋‍♀️",
+        "additionalFields": {}
+      },
+      "name": "send_atendimento",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [2528, 512],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE \"Session\" SET status = 'WAITING', bot_state = NULL, is_processing = false, \"updatedAt\" = NOW() WHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('query_session').item.json.session_id }}"
+        }
+      },
+      "name": "set_status_waiting",
+      "type": "n8n-nodes-base.postgres",
+      "position": [2752, 512],
+      "typeVersion": 2.6
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE \"Session\" SET bot_state = 'awaiting_more_questions', last_interaction_at = NOW(), is_processing = false, \"updatedAt\" = NOW() WHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('query_session').item.json.session_id }}"
+        }
+      },
+      "name": "set_state_more_questions",
+      "type": "n8n-nodes-base.postgres",
+      "position": [2752, -256],
+      "typeVersion": 2.6
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/1033608286495939/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer EAANXzFQZBS3wBQ6Q4VGHH2xgsZCv2UjAYiZB1yNGUqlyjVNZBZAUi05s0dnA6vdlHFmAZB8f6Pu0YQbfdz2PQUwqHehjI6ZCytYzYlSzVD70CHxmLJsEsEin2FlNZBNaKZB3xRrMDKRjkjR2xGxi85giFJr1ZBy8XsWwVRrA7dZBdAJWdXbjhnB00LGfofh8lw0RL1T5wZDZD"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $('query_session').item.json.phone }}\",\n  \"type\": \"interactive\",\n  \"interactive\": {\n    \"type\": \"button\",\n    \"body\": {\n      \"text\": \"Consegui tirar sua dúvida? Posso te ajudar com mais alguma coisa hoje? 🪐✨\"\n    },\n    \"action\": {\n      \"buttons\": [\n        {\n          \"type\": \"reply\",\n          \"reply\": {\n            \"id\": \"btn_sim_opcoes\",\n            \"title\": \"Sim, ver menu\"\n          }\n        },\n        {\n          \"type\": \"reply\",\n          \"reply\": {\n            \"id\": \"btn_nao_encerrar\",\n            \"title\": \"Não, obrigado\"\n          }\n        }\n      ]\n    }\n  }\n}",
+        "options": {}
+      },
+      "name": "send_more_questions_prompt",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [2976, -256],
+      "typeVersion": 4.4,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE \"Session\" SET bot_state = 'awaiting_purchase', last_interaction_at = NOW(), is_processing = false, \"updatedAt\" = NOW() WHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('query_session').item.json.session_id }}"
+        }
+      },
+      "name": "set_state_purchase",
+      "type": "n8n-nodes-base.postgres",
+      "position": [2752, 224],
+      "typeVersion": 2.6
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/1033608286495939/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer EAANXzFQZBS3wBQ6Q4VGHH2xgsZCv2UjAYiZB1yNGUqlyjVNZBZAUi05s0dnA6vdlHFmAZB8f6Pu0YQbfdz2PQUwqHehjI6ZCytYzYlSzVD70CHxmLJsEsEin2FlNZBNaKZB3xRrMDKRjkjR2xGxi85giFJr1ZBy8XsWwVRrA7dZBdAJWdXbjhnB00LGfofh8lw0RL1T5wZDZD"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $('query_session').item.json.phone }}\",\n  \"type\": \"interactive\",\n  \"interactive\": {\n    \"type\": \"list\",\n    \"header\": {\n      \"type\": \"text\",\n      \"text\": \"Planeta Imaginário 🪐\"\n    },\n    \"body\": {\n      \"text\": \"Posso te ajudar com mais alguma coisa?\\n\\nLembrando que para *comprar passaportes* ou *fechar pacotes de festas*, nossa equipe de especialistas está pronta para te atender! 👇\"\n    },\n    \"footer\": {\n      \"text\": \"Toque no botão abaixo para escolher\"\n    },\n    \"action\": {\n      \"button\": \"📋 Ver Opções\",\n      \"sections\": [\n        {\n          \"title\": \"Comprar ou Agendar\",\n          \"rows\": [\n            {\n              \"id\": \"menu_atendente\",\n              \"title\": \"🙋‍♀️ Falar com Equipe\",\n              \"description\": \"Comprar passaportes, festas ou outras dúvidas\"\n            }\n          ]\n        },\n        {\n          \"title\": \"Dúvidas Frequentes\",\n          \"rows\": [\n            {\n              \"id\": \"menu_valores\",\n              \"title\": \"🎟️ Valores\",\n              \"description\": \"Preços por tempo de brincadeira\"\n            },\n            {\n              \"id\": \"menu_eventos\",\n              \"title\": \"🎨 Programações\",\n              \"description\": \"Programação especial e colônia\"\n            },\n            {\n              \"id\": \"menu_localizacao\",\n              \"title\": \"📍 Local e Horários\",\n              \"description\": \"Onde encontrar nossa unidade\"\n            }\n          ]\n        }\n      ]\n    }\n  }\n}",
+        "options": {}
+      },
+      "name": "send_purchase_menu",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [2976, 224],
+      "typeVersion": 4.4,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Respond 200 OK').item.json.body.entry[0].changes[0].value.messages[0].interactive.button_reply.id }}",
+                    "rightValue": "btn_sim_opcoes",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sim_menu"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Respond 200 OK').item.json.body.entry[0].changes[0].value.messages[0].interactive.button_reply.id }}",
+                    "rightValue": "btn_nao_encerrar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "nao_encerrar"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "name": "route_more_questions",
+      "type": "n8n-nodes-base.switch",
+      "position": [2304, 320],
+      "typeVersion": 3.4,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1033608286495939",
+        "recipientPhoneNumber": "={{ $('query_session').item.json.phone }}",
+        "textBody": "Obrigado pelo contato! Se precisar de algo, é só mandar mensagem. Até mais! 🪐✨",
+        "additionalFields": {}
+      },
+      "name": "send_goodbye",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [2528, 704],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE \"Session\" SET status = 'CLOSED', bot_state = NULL, is_processing = false, \"updatedAt\" = NOW() WHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('query_session').item.json.session_id }}"
+        }
+      },
+      "name": "close_session",
+      "type": "n8n-nodes-base.postgres",
+      "position": [2752, 704],
+      "typeVersion": 2.6
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1033608286495939",
+        "recipientPhoneNumber": "={{ $('query_session').item.json.phone }}",
+        "textBody": "Desculpe, não entendi sua resposta. 😅",
+        "additionalFields": {}
+      },
+      "name": "send_fallback",
+      "type": "n8n-nodes-base.whatsApp",
+      "position": [2528, 896],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE \"Session\" SET is_processing = false, \"updatedAt\" = NOW() WHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('query_session').item.json.session_id }}"
+        }
+      },
+      "name": "release_lock_fallback",
+      "type": "n8n-nodes-base.postgres",
+      "position": [2752, 896],
+      "typeVersion": 2.6
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH inserted_contact AS (\n  INSERT INTO \"Contact\" (id, name, phone, \"updatedAt\", \"createdAt\")\n  VALUES (gen_random_uuid()::text, $1, $2, now(), now())\n  ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name\n  RETURNING id\n)\nINSERT INTO \"Session\" (id, status, \"bot_state\", \"contactId\", \"is_processing\", \"last_interaction_at\", \"updatedAt\", \"createdAt\")\nSELECT gen_random_uuid()::text, 'BOT', 'menu_inicial', id, false, now(), now(), now()\nFROM inserted_contact\nRETURNING id as session_id, \"bot_state\";",
+        "options": {
+          "queryReplacement": "={{ $('Respond 200 OK').item.json.body.entry[0].changes[0].value.contacts[0].profile.name }}, {{ $('Respond 200 OK').item.json.body.entry[0].changes[0].value.messages[0].from }}"
+        }
+      },
+      "name": "create_contact_and_session",
+      "type": "n8n-nodes-base.postgres",
+      "position": [960, 320],
+      "typeVersion": 2.6
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE \"Session\" SET is_processing = false, \"updatedAt\" = NOW() WHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('query_session').item.json.session_id }}"
+        }
+      },
+      "name": "release_lock_stop",
+      "type": "n8n-nodes-base.postgres",
+      "position": [1184, 320],
+      "typeVersion": 2.6,
+      "notesInFlow": true,
+      "notes": "Agent handling — release lock and stop"
+    }
+  ],
+  "connections": {
+    "Webhook GET (Meta Handshake)": {
+      "main": [
+        [{ "node": "Respond with Challenge", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook POST (Recebe Mensagens)": {
+      "main": [
+        [{ "node": "Forward to Backend", "type": "main", "index": 0 }]
+      ]
+    },
+    "Forward to Backend": {
+      "main": [
+        [{ "node": "Respond 200 OK", "type": "main", "index": 0 }]
+      ]
+    },
+    "Respond 200 OK": {
+      "main": [
+        [{ "node": "filtra_msg", "type": "main", "index": 0 }]
+      ]
+    },
+    "filtra_msg": {
+      "main": [
+        [{ "node": "query_session", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "query_session": {
+      "main": [
+        [{ "node": "session_exists?", "type": "main", "index": 0 }]
+      ]
+    },
+    "session_exists?": {
+      "main": [
+        [{ "node": "check_status", "type": "main", "index": 0 }],
+        [{ "node": "create_contact_and_session", "type": "main", "index": 0 }]
+      ]
+    },
+    "check_status": {
+      "main": [
+        [{ "node": "acquire_lock", "type": "main", "index": 0 }],
+        [{ "node": "release_lock_stop", "type": "main", "index": 0 }],
+        [{ "node": "release_lock_stop", "type": "main", "index": 0 }],
+        [{ "node": "release_lock_stop", "type": "main", "index": 0 }]
+      ]
+    },
+    "acquire_lock": {
+      "main": [
+        [{ "node": "lock_acquired?", "type": "main", "index": 0 }]
+      ]
+    },
+    "lock_acquired?": {
+      "main": [
+        [{ "node": "inactivity_timeout?", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "inactivity_timeout?": {
+      "main": [
+        [{ "node": "reset_bot_state", "type": "main", "index": 0 }],
+        [{ "node": "route_by_bot_state", "type": "main", "index": 0 }]
+      ]
+    },
+    "reset_bot_state": {
+      "main": [
+        [{ "node": "send_menu", "type": "main", "index": 0 }]
+      ]
+    },
+    "create_contact_and_session": {
+      "main": [
+        [{ "node": "send_menu", "type": "main", "index": 0 }]
+      ]
+    },
+    "route_by_bot_state": {
+      "main": [
+        [{ "node": "send_menu", "type": "main", "index": 0 }],
+        [{ "node": "route_menu_choice", "type": "main", "index": 0 }],
+        [{ "node": "route_more_questions", "type": "main", "index": 0 }],
+        [{ "node": "route_menu_choice", "type": "main", "index": 0 }],
+        [{ "node": "send_fallback", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_menu": {
+      "main": [
+        [{ "node": "set_state_awaiting_menu", "type": "main", "index": 0 }]
+      ]
+    },
+    "route_menu_choice": {
+      "main": [
+        [{ "node": "send_valores", "type": "main", "index": 0 }],
+        [{ "node": "send_loc", "type": "main", "index": 0 }],
+        [{ "node": "send_prog", "type": "main", "index": 0 }],
+        [{ "node": "send_festas", "type": "main", "index": 0 }],
+        [{ "node": "send_passaportes", "type": "main", "index": 0 }],
+        [{ "node": "send_atendimento", "type": "main", "index": 0 }],
+        [{ "node": "send_fallback", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_valores": {
+      "main": [
+        [{ "node": "set_state_more_questions", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_loc": {
+      "main": [
+        [{ "node": "set_state_more_questions", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_prog": {
+      "main": [
+        [{ "node": "set_state_more_questions", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_festas": {
+      "main": [
+        [{ "node": "set_state_purchase", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_passaportes": {
+      "main": [
+        [{ "node": "set_state_purchase", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_atendimento": {
+      "main": [
+        [{ "node": "set_status_waiting", "type": "main", "index": 0 }]
+      ]
+    },
+    "set_state_more_questions": {
+      "main": [
+        [{ "node": "send_more_questions_prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "set_state_purchase": {
+      "main": [
+        [{ "node": "send_purchase_menu", "type": "main", "index": 0 }]
+      ]
+    },
+    "route_more_questions": {
+      "main": [
+        [{ "node": "send_menu", "type": "main", "index": 0 }],
+        [{ "node": "send_goodbye", "type": "main", "index": 0 }],
+        [{ "node": "send_fallback", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_goodbye": {
+      "main": [
+        [{ "node": "close_session", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_fallback": {
+      "main": [
+        [{ "node": "release_lock_fallback", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

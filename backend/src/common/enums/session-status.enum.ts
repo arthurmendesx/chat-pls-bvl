@@ -9,5 +9,5 @@ export const VALID_STATUS_TRANSITIONS: Record<SessionStatusEnum, readonly Sessio
   [SessionStatusEnum.BOT]: [SessionStatusEnum.WAITING, SessionStatusEnum.ACTIVE, SessionStatusEnum.CLOSED],
   [SessionStatusEnum.WAITING]: [SessionStatusEnum.ACTIVE, SessionStatusEnum.CLOSED],
   [SessionStatusEnum.ACTIVE]: [SessionStatusEnum.BOT, SessionStatusEnum.CLOSED],
-  [SessionStatusEnum.CLOSED]: [],
+  [SessionStatusEnum.CLOSED]: [SessionStatusEnum.BOT],
 };

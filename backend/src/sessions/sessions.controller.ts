@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Param,
   Body,
@@ -48,5 +49,16 @@ export class SessionsController {
   @Patch(':id/return-to-bot')
   returnToBot(@Param('id') id: string) {
     return this.sessionsService.returnToBot(id);
+  }
+
+  /**
+   * Endpoint to trigger auto-close of inactive sessions.
+   * Can be called by a n8n scheduled workflow or a cron job.
+   * POST /api/sessions/auto-close
+   */
+  @Post('auto-close')
+  async autoClose() {
+    const closedCount = await this.sessionsService.closeInactiveSessions();
+    return { closed: closedCount };
   }
 }

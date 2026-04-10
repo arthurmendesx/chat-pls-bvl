@@ -16,6 +16,7 @@ body {
 	font-family: var(--font-sans);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+	background: #0e0b1e;
 }
 
 /* Custom scrollbar for sidebar and chat */
@@ -26,9 +27,10 @@ body {
 	background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-	background: #d1d5db;
+	background: rgba(124, 58, 237, 0.25);
 	border-radius: 999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-	background: #9ca3af;
+	background: rgba(124, 58, 237, 0.45);
 }
+

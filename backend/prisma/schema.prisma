@@ -51,11 +51,13 @@ model Contact {
 }
 
 model Session {
-  id        String        @id @default(uuid())
-  status    SessionStatus @default(BOT)
-  bot_state String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id                String        @id @default(uuid())
+  status            SessionStatus @default(BOT)
+  bot_state         String?
+  is_processing     Boolean       @default(false)
+  last_interaction_at DateTime?   @default(now())
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   contactId String
   contact   Contact @relation(fields: [contactId], references: [id])

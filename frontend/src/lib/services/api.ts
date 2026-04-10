@@ -1,10 +1,25 @@
 import { PUBLIC_API_URL } from '$env/static/public';
 import type { Session, Message, SessionStatus } from '../types';
+import type { AuthUser } from '../stores/auth.svelte';
 
 interface ApiError {
 	statusCode: number;
 	erro: string;
 	mensagem: string | string[];
+}
+
+interface LoginResponse {
+	accessToken: string;
+	user: AuthUser;
+}
+
+/**
+ * Retorna os headers de autenticação se houver token no localStorage.
+ */
+function getAuthHeaders(): Record<string, string> {
+	if (typeof window === 'undefined') return {};
+	const token = localStorage.getItem('auth_token');
+	return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 /**
@@ -14,6 +29,7 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 	const url = `${PUBLIC_API_URL}${endpoint}`;
 	const headers = {
 		'Content-Type': 'application/json',
+		...getAuthHeaders(),
 		...options.headers
 	};
 
@@ -38,6 +54,16 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 }
 
 export const api = {
+	/**
+	 * Autentica o usuário com email e senha no backend NestJS.
+	 */
+	async login(email: string, password: string): Promise<LoginResponse> {
+		return fetchApi<LoginResponse>('/auth/login', {
+			method: 'POST',
+			body: JSON.stringify({ email, password })
+		});
+	},
+
 	/**
 	 * Busca os atendimentos filtrados por status (BOT, WAITING, ACTIVE, CLOSED)
 	 */
@@ -65,7 +91,7 @@ export const api = {
 	 */
 	async updateSessionStatus(sessionId: string, newStatus: SessionStatus): Promise<Session> {
 		try {
-			return await fetchApi<Session>(`/chats/${sessionId}/status`, {
+			return await fetchApi<Session>(`/sessions/${sessionId}/status`, {
 				method: 'PATCH',
 				body: JSON.stringify({ status: newStatus })
 			});

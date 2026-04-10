@@ -32,6 +32,9 @@ export interface WebhookProcessingResult {
 
 const META_API_BASE = 'https://graph.facebook.com/v19.0';
 
+/** Message types that contain user-generated content we should store */
+const PROCESSABLE_MESSAGE_TYPES = ['text', 'interactive', 'button', 'image', 'document', 'audio', 'video', 'sticker', 'location', 'contacts'];
+
 @Injectable()
 export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name);
@@ -63,7 +66,8 @@ export class WhatsAppService {
         const contacts = value.contacts ?? [];
 
         for (const message of messages) {
-          if (message.type !== 'text' || !message.text) continue;
+          // Handle ALL user-facing message types, not just text
+          if (!PROCESSABLE_MESSAGE_TYPES.includes(message.type)) continue;
 
           const contactProfile = contacts.find(
             (c) => c.wa_id === message.from,
@@ -79,12 +83,18 @@ export class WhatsAppService {
             contact.id,
           );
 
+          // Extract the displayable content from different message types
+          const content = this.extractMessageContent(message);
+
           await this.messagesRepository.create({
-            content: message.text.body,
+            content,
             senderType: 'CONTACT',
             externalId: message.id,
             sessionId: session.id,
           });
+
+          // Update last_interaction_at and check inactivity timeout
+          await this.sessionsService.touchSession(session.id);
 
           if (!sessionIds.includes(session.id)) {
             sessionIds.push(session.id);
@@ -93,7 +103,7 @@ export class WhatsAppService {
           processed++;
 
           this.logger.log(
-            `Mensagem recebida de ${message.from} na sessão ${session.id} (status: ${session.status})`,
+            `Mensagem recebida de ${message.from} na sessão ${session.id} (status: ${session.status}, tipo: ${message.type})`,
           );
         }
       }
@@ -154,6 +164,57 @@ export class WhatsAppService {
     );
 
     return externalId;
+  }
+
+  /**
+   * Extracts a human-readable content string from different WhatsApp message types.
+   */
+  private extractMessageContent(message: any): string {
+    const type = message?.type as string;
+
+    switch (type) {
+      case 'text': {
+        const text = message.text as { body?: string } | undefined;
+        return text?.body ?? '';
+      }
+      case 'interactive': {
+        const interactive = message.interactive as Record<string, unknown> | undefined;
+        if (!interactive) return '[interactive]';
+
+        const interactiveType = interactive.type as string;
+        if (interactiveType === 'list_reply') {
+          const listReply = interactive.list_reply as { id?: string; title?: string } | undefined;
+          return `[list_reply] ${listReply?.title ?? ''} (id: ${listReply?.id ?? ''})`;
+        }
+        if (interactiveType === 'button_reply') {
+          const buttonReply = interactive.button_reply as { id?: string; title?: string } | undefined;
+          return `[button_reply] ${buttonReply?.title ?? ''} (id: ${buttonReply?.id ?? ''})`;
+        }
+        return `[interactive:${interactiveType}]`;
+      }
+      case 'button': {
+        const button = message.button as { text?: string; payload?: string } | undefined;
+        return `[button] ${button?.text ?? button?.payload ?? ''}`;
+      }
+      case 'image':
+        return '[imagem]';
+      case 'audio':
+        return '[áudio]';
+      case 'video':
+        return '[vídeo]';
+      case 'document':
+        return '[documento]';
+      case 'sticker':
+        return '[sticker]';
+      case 'location': {
+        const location = message.location as { latitude?: number; longitude?: number } | undefined;
+        return `[localização] ${location?.latitude ?? ''},${location?.longitude ?? ''}`;
+      }
+      case 'contacts':
+        return '[contato compartilhado]';
+      default:
+        return `[${type}]`;
+    }
   }
 
   private mapMetaError(code?: number, message?: string): string {

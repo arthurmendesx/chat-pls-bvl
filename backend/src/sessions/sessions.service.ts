@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { SessionsRepository } from './sessions.repository.js';
 import type { SessionWithContact, SessionWithRelations } from './sessions.repository.js';
@@ -11,8 +12,16 @@ import {
 } from '../common/enums/session-status.enum.js';
 import type { SessionStatus } from '@prisma/client';
 
+/** Inactivity timeout in minutes — after this, bot_state resets to menu_inicial */
+const INACTIVITY_TIMEOUT_MINUTES = 60;
+
+/** Auto-close threshold in hours — sessions inactive longer than this get closed */
+const AUTO_CLOSE_HOURS = 12;
+
 @Injectable()
 export class SessionsService {
+  private readonly logger = new Logger(SessionsService.name);
+
   constructor(private readonly sessionsRepository: SessionsRepository) {}
 
   async findAll(status?: string): Promise<SessionWithRelations[]> {
@@ -41,6 +50,29 @@ export class SessionsService {
     }
 
     return this.sessionsRepository.create(contactId);
+  }
+
+  /**
+   * Called when a new message arrives. Updates last_interaction_at and
+   * checks if the session was inactive long enough to reset bot_state.
+   */
+  async touchSession(sessionId: string): Promise<SessionWithContact> {
+    const session = await this.findById(sessionId);
+
+    // Check for inactivity timeout — if user was away for > 1 hour, reset to menu
+    if (session.status === 'BOT' && session.last_interaction_at) {
+      const minutesSinceLastInteraction =
+        (Date.now() - new Date(session.last_interaction_at).getTime()) / (1000 * 60);
+
+      if (minutesSinceLastInteraction > INACTIVITY_TIMEOUT_MINUTES) {
+        this.logger.log(
+          `Session ${sessionId}: inactive for ${Math.round(minutesSinceLastInteraction)} min, resetting bot_state to menu_inicial`,
+        );
+        await this.sessionsRepository.updateBotState(sessionId, 'menu_inicial');
+      }
+    }
+
+    return this.sessionsRepository.updateLastInteraction(sessionId);
   }
 
   async updateStatus(
@@ -94,9 +126,21 @@ export class SessionsService {
       null,
     );
 
-    await this.sessionsRepository.updateBotState(sessionId, null);
+    await this.sessionsRepository.updateBotState(sessionId, 'menu_inicial');
 
     return updated;
+  }
+
+  /**
+   * Auto-close sessions that have been inactive for > AUTO_CLOSE_HOURS.
+   * Should be called periodically (e.g., via a cron job or n8n scheduled workflow).
+   */
+  async closeInactiveSessions(): Promise<number> {
+    const count = await this.sessionsRepository.closeInactiveSessions(AUTO_CLOSE_HOURS);
+    if (count > 0) {
+      this.logger.log(`Auto-closed ${count} inactive sessions (> ${AUTO_CLOSE_HOURS}h)`);
+    }
+    return count;
   }
 
   private validateTransition(

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Session" ADD COLUMN "is_processing" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Session" ADD COLUMN "last_interaction_at" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP;
