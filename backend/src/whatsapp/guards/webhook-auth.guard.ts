@@ -11,14 +11,14 @@ export class WebhookAuthGuard implements CanActivate {
   private readonly webhookSecret: string;
 
   constructor(config: ConfigService) {
-    this.webhookSecret = config.getOrThrow<string>('WEBHOOK_SECRET');
+    this.webhookSecret = config.getOrThrow<string>('WEBHOOK_SECRET').trim();
   }
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
-    const secret = request.headers['x-webhook-secret'];
+    const secret = request.headers['x-webhook-secret'] as string | undefined;
 
-    if (secret !== this.webhookSecret) {
+    if (!secret || secret.trim() !== this.webhookSecret) {
       throw new UnauthorizedException('Webhook secret inválido.');
     }
 
