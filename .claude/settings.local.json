@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__n8n__search_workflows",
+      "mcp__n8n__get_workflow_details"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "hostinger-mcp"
+  ]
+}
