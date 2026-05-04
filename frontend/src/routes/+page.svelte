@@ -17,27 +17,28 @@
 
 	let loading = $state(true);
 	let error = $state('');
+	let realtimeConnected = $state(false);
 
 	// Carrega todas as sessões baseadas nos 3 status que suportamos
-	async function loadAllSessions() {
+	async function loadAllSessions(showSpinner = false) {
 		try {
-			loading = true;
-			const bot = await api.fetchSessions(SessionStatus.BOT);
-			const waiting = await api.fetchSessions(SessionStatus.WAITING);
-			const active = await api.fetchSessions(SessionStatus.ACTIVE);
-
-			// Consolida todos e manda pro store (que possui ordenação automática por updatedAt)
+			if (showSpinner) loading = true;
+			const [bot, waiting, active] = await Promise.all([
+				api.fetchSessions(SessionStatus.BOT),
+				api.fetchSessions(SessionStatus.WAITING),
+				api.fetchSessions(SessionStatus.ACTIVE)
+			]);
 			sessionsStore.setSessions([...bot, ...waiting, ...active]);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Falha fatal ao carregar o sistema.';
 		} finally {
-			loading = false;
+			if (showSpinner) loading = false;
 		}
 	}
 
 	onMount(() => {
-		// 1. Carga Inicial
-		loadAllSessions();
+		// 1. Carga Inicial (com spinner)
+		loadAllSessions(true);
 
 		// 2. Subscrições Realtime - Tabela de Mensagens
 		const messageSubscription = supabase
@@ -46,14 +47,13 @@
 				'postgres_changes',
 				{ event: 'INSERT', schema: 'public', table: 'Message' },
 				(payload) => {
-					// Quando o n8n ou o cliente enviam mensagem, injetamos no chat em tempo real
 					chatStore.appendMessage(payload.new as Message);
-					// Nota: Numa aplicação real, a API backend deveria nos avisar das sessões, mas
-					// como pedimos Realtime puro pelo Supabase, também re-buscamos se não tivermos
-					// a sessão correspondente no store.
 				}
 			)
-			.subscribe();
+			.subscribe((status) => {
+				if (status === 'SUBSCRIBED') realtimeConnected = true;
+				if (status === 'CLOSED' || status === 'CHANNEL_ERROR') realtimeConnected = false;
+			});
 
 		// 3. Subscrições Realtime - Tabela de Sessões
 		const sessionSubscription = supabase
@@ -61,18 +61,19 @@
 			.on(
 				'postgres_changes',
 				{ event: '*', schema: 'public', table: 'Session' },
-				(payload) => {
-					// Quando o status muda (Ex: BOT -> WAITING), re-buscamos a tabela inteira
-					// ou poderíamos apenas atualizar localmente. Vamos chamar a carga global
-					// para garantir integridade do contact join.
+				() => {
 					loadAllSessions();
 				}
 			)
 			.subscribe();
 
+		// 4. Polling fallback — silently refreshes every 30s to catch missed Realtime events
+		const pollInterval = setInterval(() => loadAllSessions(), 30_000);
+
 		return () => {
 			supabase.removeChannel(messageSubscription);
 			supabase.removeChannel(sessionSubscription);
+			clearInterval(pollInterval);
 		};
 	});
 </script>
@@ -98,6 +99,7 @@
 			</div>
 		</div>
 		<div class="header-right">
+			<div class="realtime-indicator" class:connected={realtimeConnected} title={realtimeConnected ? 'Realtime conectado' : 'Atualizando via polling'}></div>
 			<div class="user-pill">
 				<div class="user-avatar">
 					{(auth.user?.name ?? 'A').substring(0, 1).toUpperCase()}
@@ -233,6 +235,19 @@
 		font-size: 0.8125rem;
 		font-weight: 500;
 		color: rgba(255, 255, 255, 0.7);
+	}
+
+	.realtime-indicator {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.15);
+		transition: background 0.4s;
+	}
+
+	.realtime-indicator.connected {
+		background: #34d399;
+		box-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
 	}
 
 	.logout-btn {

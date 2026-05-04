@@ -13,6 +13,10 @@ class WhatsAppContact {
 
   @IsString()
   wa_id!: string;
+
+  @IsOptional()
+  @IsString()
+  user_id?: string;
 }
 
 class WhatsAppTextContent {
@@ -73,6 +77,10 @@ class WhatsAppInteractive {
 class WhatsAppMessage {
   @IsString()
   from!: string;
+
+  @IsOptional()
+  @IsString()
+  from_user_id?: string;
 
   @IsString()
   id!: string;
